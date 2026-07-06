@@ -35,4 +35,5 @@ def create_file(path:str,content:str):
 
 
 if __name__ == "__main__":
-    main()
+    logger.info("MCP server running")
+    app.run()
