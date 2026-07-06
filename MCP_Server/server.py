@@ -25,6 +25,14 @@ def read_file(path:str):
         logger.exception("Failed to read")
         return f"Error reading file:{e}"
 
+def create_file(path:str,content:str):
+    try:
+        with open(path,"w",encoding="utf-8") as f:
+            return f.write(content)
+    except Exception as e:
+        logger.exception(f"Failed to create file ")
+        return f"Error Creating file:{e}"
+
 
 if __name__ == "__main__":
     main()
