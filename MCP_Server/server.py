@@ -16,7 +16,7 @@ def list_files(path:str):
         logger.exception("Failed to list the files")
         return f"Error listing files:{e}"
 
-@app.tool(Description="Read and return the text content of the file")
+@app.tool(Description="Read and return the text content of the files")
 def read_file(path:str):
     try:
         with open(path,"r",encoding="utf-8") as f:
