@@ -24,7 +24,7 @@ async def main():
 
             await session.initialize()
 
-            print("\n MCP session initialized")
+            print("\n MCP session is initialized")
 
             # list the files(for discovery)
 
