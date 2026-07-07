@@ -1,4 +1,4 @@
-# 🔌 Model Context Protocol (MCP) — Complete Guide
+# Model Context Protocol (MCP) — Complete Guide
 
 A practical, all-in-one reference for understanding and building with the **Model Context Protocol (MCP)** — Anthropic's open standard for connecting AI models to external tools, data, and systems.
 
@@ -11,7 +11,7 @@ A practical, all-in-one reference for understanding and building with the **Mode
 
 ---
 
-## 📚 Table of Contents
+## Table of Contents
 
 1. [What is MCP?](#1-what-is-mcp)
 2. [Core Concepts](#2-core-concepts)
@@ -48,13 +48,13 @@ Once a tool exposes an MCP server, **any** MCP-compatible client (Claude Desktop
 
 ### Key Benefits
 
-- 🔄 **Standardization** — one protocol instead of N×M custom integrations
-- ♻️ **Reusability** — write a server once, use it from any MCP client
-- 🧩 **Separation of concerns** — the model doesn't need to know API details; the server handles that
-- 🔒 **Security boundary** — servers control exactly what's exposed to the model
+- **Standardization** — one protocol instead of N×M custom integrations
+- **Reusability** — write a server once, use it from any MCP client
+- **Separation of concerns** — the model doesn't need to know API details; the server handles that
+- **Security boundary** — servers control exactly what's exposed to the model
 
 <details>
-<summary><strong>🍽️ Restaurant Analogy (click to expand)</strong></summary>
+<summary><strong>Restaurant Analogy (click to expand)</strong></summary>
 <br>
 
 | Term | Role | Analogy |
@@ -378,7 +378,7 @@ async def main():
 | `logging_callback` | Server sends a log notification | `None` | Surface server-side logs in your client's UI/console |
 | `message_handler` | Any server-to-client message not covered by a specific callback | `None` | Catch-all hook — useful for debugging or custom notification types |
 
-> 💡 **Note:** All callbacks are optional. If you don't pass one and the server makes that kind of request, `ClientSession` returns a default "not supported" response instead of crashing.
+> **Note:** All callbacks are optional. If you don't pass one and the server makes that kind of request, `ClientSession` returns a default "not supported" response instead of crashing.
 
 ---
 
@@ -457,7 +457,7 @@ Then, in the Inspector UI, manually enter the server's URL and select **Streamab
 6. Fix issues, restart Inspector, repeat
 
 <details>
-<summary><strong>⚠️ Common Gotchas (click to expand)</strong></summary>
+<summary><strong>Common Gotchas (click to expand)</strong></summary>
 <br>
 
 - Missing **docstrings** on `@mcp.tool()` functions can cause schema generation issues — always document your tools.
