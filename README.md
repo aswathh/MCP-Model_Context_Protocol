@@ -45,6 +45,7 @@ MCP solves this with a single, standardized protocol:
 ```
 
 Once a tool exposes an MCP server, **any** MCP-compatible client (Claude Desktop, Claude Code, your own app) can use it — no custom integration required. Client and server talk to each other using **JSON-RPC 2.0** as the underlying message protocol.
+<<<<<<< HEAD
 
 ### Key Benefits
 
@@ -55,6 +56,18 @@ Once a tool exposes an MCP server, **any** MCP-compatible client (Claude Desktop
 
 <details>
 <summary><strong>🍽️ Restaurant Analogy (click to expand)</strong></summary>
+=======
+
+### Key Benefits
+
+- **Standardization** — one protocol instead of N×M custom integrations
+- **Reusability** — write a server once, use it from any MCP client
+- **Separation of concerns** — the model doesn't need to know API details; the server handles that
+- **Security boundary** — servers control exactly what's exposed to the model
+
+<details>
+<summary><strong>Restaurant Analogy (click to expand)</strong></summary>
+>>>>>>> 61cc14c81d7784ab904526ed0c4396c6b7f92557
 <br>
 
 | Term | Role | Analogy |
@@ -378,7 +391,11 @@ async def main():
 | `logging_callback` | Server sends a log notification | `None` | Surface server-side logs in your client's UI/console |
 | `message_handler` | Any server-to-client message not covered by a specific callback | `None` | Catch-all hook — useful for debugging or custom notification types |
 
+<<<<<<< HEAD
 > 💡 **Note:** All callbacks are optional. If you don't pass one and the server makes that kind of request, `ClientSession` returns a default "not supported" response instead of crashing.
+=======
+> **Note:** All callbacks are optional. If you don't pass one and the server makes that kind of request, `ClientSession` returns a default "not supported" response instead of crashing.
+>>>>>>> 61cc14c81d7784ab904526ed0c4396c6b7f92557
 
 ---
 
@@ -457,7 +474,11 @@ Then, in the Inspector UI, manually enter the server's URL and select **Streamab
 6. Fix issues, restart Inspector, repeat
 
 <details>
+<<<<<<< HEAD
 <summary><strong>⚠️ Common Gotchas (click to expand)</strong></summary>
+=======
+<summary><strong>Common Gotchas (click to expand)</strong></summary>
+>>>>>>> 61cc14c81d7784ab904526ed0c4396c6b7f92557
 <br>
 
 - Missing **docstrings** on `@mcp.tool()` functions can cause schema generation issues — always document your tools.
