@@ -1,23 +1,41 @@
-# Model Context Protocol (MCP) — Complete Guide
+# 🔌 Model Context Protocol (MCP) — Complete Guide
 
-A practical reference for understanding and building with the Model Context Protocol (MCP) — Anthropic's open standard for connecting AI models to external tools, data, and systems.
+A practical, all-in-one reference for understanding and building with the **Model Context Protocol (MCP)** — Anthropic's open standard for connecting AI models to external tools, data, and systems.
+
+<p align="left">
+  <img src="https://img.shields.io/badge/Protocol-JSON--RPC%202.0-blue" alt="JSON-RPC 2.0"/>
+  <img src="https://img.shields.io/badge/SDK-FastMCP-orange" alt="FastMCP"/>
+  <img src="https://img.shields.io/badge/Debug-MCP%20Inspector-green" alt="MCP Inspector"/>
+  <img src="https://img.shields.io/badge/Language-Python-yellow" alt="Python"/>
+</p>
 
 ---
 
-## Table of Contents
+## 📚 Table of Contents
 
 1. [What is MCP?](#1-what-is-mcp)
-2. [Core Concepts: Client, Server, Transport, Elicitation, Sampling](#2-core-concepts)
-3. [Important Imports Explained](#3-important-imports-explained)
-4. [MCP Inspector — Setup & Usage](#4-mcp-inspector--setup--usage)
+2. [Core Concepts](#2-core-concepts)
+   - [2.1 MCP Server](#21-mcp-server)
+   - [2.2 MCP Client](#22-mcp-client)
+   - [2.3 Transport](#23-transport)
+   - [2.4 Sampling](#24-sampling)
+   - [2.5 Elicitation](#25-elicitation)
+   - [2.6 Roots](#26-roots)
+3. [Sampling vs Elicitation — Don't Confuse Them](#3-sampling-vs-elicitation--dont-confuse-them)
+4. [Client-Side Callbacks — Handling Server Requests](#4-client-side-callbacks--handling-server-requests)
+5. [Important Imports Explained](#5-important-imports-explained)
+6. [MCP Inspector — Setup & Usage](#6-mcp-inspector--setup--usage)
+7. [Quick Recap Table](#7-quick-recap-table)
+8. [Summary Cheat Sheet](#8-summary-cheat-sheet)
+9. [What to Practice Next](#9-what-to-practice-next)
 
 ---
 
 ## 1. What is MCP?
 
-**Model Context Protocol (MCP)** is an open standard, introduced by Anthropic, that defines a common way for AI applications (like Claude) to connect to external tools, databases, files, and APIs.
+Think of MCP as a **"USB-C port" for AI models**.
 
-Before MCP, every integration (Slack, GitHub, a local database, a filesystem) needed custom, one-off glue code between the LLM and the tool. This is often called the **"N×M integration problem"** — N models × M tools = N×M custom integrations.
+Before MCP, every AI application that wanted to connect to tools or data (Slack, GitHub, a local database, a filesystem) needed its own custom, one-off glue code. This is often called the **"N×M integration problem"** — N models × M tools = N custom integrations for every single tool.
 
 MCP solves this with a single, standardized protocol:
 
@@ -26,15 +44,28 @@ MCP solves this with a single, standardized protocol:
    e.g. Claude Desktop               e.g. GitHub server      e.g. GitHub API
 ```
 
-Once a tool exposes an MCP server, **any** MCP-compatible client (Claude Desktop, Claude Code, your own app) can use it without custom code.
+Once a tool exposes an MCP server, **any** MCP-compatible client (Claude Desktop, Claude Code, your own app) can use it — no custom integration required. Client and server talk to each other using **JSON-RPC 2.0** as the underlying message protocol.
 
-### Key benefits
-- **Standardization** — one protocol instead of N×M custom integrations
-- **Reusability** — write a server once, use it from any MCP client
-- **Separation of concerns** — the model doesn't need to know API details; the server handles that
-- **Security boundary** — servers control exactly what's exposed to the model
+### Key Benefits
 
-### MCP Architecture (3 pieces)
+- 🔄 **Standardization** — one protocol instead of N×M custom integrations
+- ♻️ **Reusability** — write a server once, use it from any MCP client
+- 🧩 **Separation of concerns** — the model doesn't need to know API details; the server handles that
+- 🔒 **Security boundary** — servers control exactly what's exposed to the model
+
+<details>
+<summary><strong>🍽️ Restaurant Analogy (click to expand)</strong></summary>
+<br>
+
+| Term | Role | Analogy |
+|---|---|---|
+| **MCP Server** | Exposes tools/resources/prompts | The restaurant **kitchen** — has a menu (tools), takes orders |
+| **MCP Client** | Connects to a server and uses its capabilities | The **waiter** — takes the order to the kitchen, brings food back |
+| **Host** | The actual application running the client | The **restaurant itself** (Claude Desktop, your app) |
+
+</details>
+
+### MCP Architecture (3 Pieces)
 
 | Component | Role |
 |---|---|
@@ -46,23 +77,21 @@ Once a tool exposes an MCP server, **any** MCP-compatible client (Claude Desktop
 
 ## 2. Core Concepts
 
-MCP defines a few core building blocks. Each has a clear responsibility.
+MCP defines a few core building blocks. Each has a clear, single responsibility.
 
 ### 2.1 MCP Server
 
-A server exposes capabilities to clients. It's typically a small, focused program — e.g., "GitHub server," "filesystem server," "database server."
-
-**Sample syntax (FastMCP — Python):**
+A server exposes capabilities to clients. It's typically small and focused — e.g. a "GitHub server," "filesystem server," or "database server."
 
 ```python
 from mcp.server.fastmcp import FastMCP
 
-# Create a server instance
+# Create a server instance and give it an identity
 mcp = FastMCP("weather-server")
 
 @mcp.tool()
 def get_weather(city: str) -> str:
-    """Get current weather for a city."""
+    """Get current weather for a city."""   # <- docstring = tool description the LLM reads
     return f"The weather in {city} is sunny, 28°C."
 
 @mcp.resource("config://app-settings")
@@ -79,11 +108,20 @@ if __name__ == "__main__":
     mcp.run(transport="stdio")
 ```
 
+| Line | Why it matters |
+|---|---|
+| `FastMCP("weather-server")` | Gives the server an identity name the client can recognize |
+| `@mcp.tool()` | Registers a function so the AI model can call it |
+| Docstring inside a tool | **Critical.** The LLM reads this to decide *when* to use the tool. A missing docstring causes confusion or broken schema generation |
+| `@mcp.resource()` | Read-only data — not an "action" like a tool, just data (file content, config, DB row) |
+| `@mcp.prompt()` | A reusable prompt template the client can request |
+| `mcp.run(transport=...)` | Defines what kind of connection the server accepts |
+
+**When to use it:** build a server whenever you need to expose a custom tool or data source (an internal API, company DB, filesystem) to *any* MCP-compatible AI client.
+
 ### 2.2 MCP Client
 
 The client lives inside the host application. It connects to exactly **one** server, handles the handshake, and forwards requests/responses.
-
-**Sample syntax:**
 
 ```python
 from mcp import ClientSession, StdioServerParameters
@@ -97,28 +135,45 @@ server_params = StdioServerParameters(
 async def main():
     async with stdio_client(server_params) as (read, write):
         async with ClientSession(read, write) as session:
-            await session.initialize()
+            await session.initialize()          # handshake — must run first
 
-            # Discover available tools
-            tools = await session.list_tools()
+            tools = await session.list_tools()   # discover tools dynamically
             print(tools)
 
-            # Call a tool
             result = await session.call_tool("get_weather", {"city": "Bengaluru"})
             print(result)
+
+            resources = await session.list_resources()
+            data = await session.read_resource("config://app-settings")
 ```
+
+| Line | Why it matters |
+|---|---|
+| `StdioServerParameters(...)` | Tells the client how to launch the server as a subprocess |
+| `stdio_client(...)` | Opens the connection, returns `(read, write)` streams |
+| `ClientSession` | The object that handles the actual JSON-RPC conversation |
+| `session.initialize()` | **Handshake step** — client and server exchange supported capabilities. Skipping this breaks every later call |
+| `list_tools()` | Discovers available tools dynamically (never hardcode them) |
+| `call_tool(name, args)` | Invokes a tool, passing arguments as a dictionary |
+
+**When to use it:** if you're building an AI application that needs to connect to multiple MCP servers (GitHub, Slack, a custom server), you write client code — or you rely on a host that already has one built in, like Claude Desktop or Claude.ai.
 
 ### 2.3 Transport
 
-Transport defines **how** messages physically move between client and server. MCP messages themselves are JSON-RPC 2.0 — transport is just the delivery mechanism.
+Transport defines **how** messages physically move between client and server. The messages themselves are always JSON-RPC 2.0 — transport is just the delivery mechanism.
 
-| Transport | Use case |
-|---|---|
-| **stdio** | Local processes — client launches server as a subprocess, communicates over stdin/stdout. Fast, simple, no network exposure. |
-| **Streamable HTTP** | Remote servers — client connects over HTTP(S), supports streaming responses. Used for deployed/hosted MCP servers. |
-| ~~SSE (legacy)~~ | Older HTTP-based streaming transport, being phased out in favor of Streamable HTTP. |
+| Transport | Location | Setup | Use Case | Multiple Clients? | Latency |
+|---|---|---|---|---|---|
+| **stdio** | Same machine | Simple, no network config | Local tools, dev/testing | No (1 client per process) | Very low |
+| **Streamable HTTP** | Local or remote | Needs host/port, maybe auth | Production, shared/remote servers | Yes | Network-dependent |
+| ~~SSE (legacy)~~ | — | — | Being phased out in favor of Streamable HTTP | — | — |
 
-**stdio transport (local):**
+**stdio (local):**
+```python
+mcp.run(transport="stdio")
+```
+The server runs as a local subprocess. The client launches it and talks over stdin/stdout pipes — no network involved. Used for local file access, local DB, CLI tools (e.g. a local server added inside Claude Desktop).
+
 ```python
 from mcp.client.stdio import stdio_client, StdioServerParameters
 
@@ -127,7 +182,12 @@ async with stdio_client(params) as (read, write):
     ...
 ```
 
-**Streamable HTTP transport (remote):**
+**Streamable HTTP (remote):**
+```python
+mcp.run(transport="streamable-http", host="0.0.0.0", port=8000)
+```
+The server exposes an HTTP endpoint (e.g. `http://localhost:8000/mcp`). The client sends HTTP requests and receives streaming responses. Used when a server is hosted remotely/in the cloud and needs to serve multiple teams or apps at once.
+
 ```python
 from mcp.client.streamable_http import streamablehttp_client
 
@@ -137,34 +197,13 @@ async with streamablehttp_client("https://my-mcp-server.com/mcp") as (read, writ
         tools = await session.list_tools()
 ```
 
-### 2.4 Elicitation
+### 2.4 Sampling
 
-Elicitation lets a **server ask the user (via the client) for additional input** mid-operation — for example, confirming an action or requesting missing information before proceeding.
+**Direction: Server → Client's LLM.**
 
-**Sample syntax:**
+Sampling lets a **server request an LLM completion through the client** — the server "borrows" the model's intelligence without needing its own API key or model access. The client stays in control and can approve, deny, or modify the request (human-in-the-loop).
 
-```python
-from mcp.server.fastmcp import FastMCP, Context
-
-mcp = FastMCP("booking-server")
-
-@mcp.tool()
-async def book_flight(destination: str, ctx: Context) -> str:
-    """Book a flight, confirming with the user first."""
-    result = await ctx.elicit(
-        message=f"Confirm booking a flight to {destination}?",
-        schema={"type": "object", "properties": {"confirm": {"type": "boolean"}}}
-    )
-    if result.data.get("confirm"):
-        return f"Flight to {destination} booked!"
-    return "Booking cancelled."
-```
-
-### 2.5 Sampling
-
-Sampling lets a **server request an LLM completion through the client** — meaning the server can "borrow" the model's intelligence without needing its own API key or model access. The client stays in control (it can approve/deny/modify the request).
-
-**Sample syntax:**
+> Normally tool calls flow Client → Server. Sampling reverses that: Server → Client, asking "please have your LLM generate this for me."
 
 ```python
 from mcp.server.fastmcp import FastMCP, Context
@@ -181,22 +220,186 @@ async def summarize(text: str, ctx: Context) -> str:
     return response.content.text
 ```
 
+**When to use it:** the server needs some AI reasoning (summarizing, classifying) but doesn't hold a standalone LLM connection — so it borrows the client's model instead.
+
+### 2.5 Elicitation
+
+**Direction: Server → User (via the client).**
+
+Elicitation lets a **server ask the user for additional input mid-operation** — for example, confirming an action or requesting missing information before it can finish a task.
+
+```python
+from mcp.server.fastmcp import FastMCP, Context
+
+mcp = FastMCP("booking-server")
+
+@mcp.tool()
+async def book_flight(destination: str, ctx: Context) -> str:
+    """Book a flight, confirming with the user first."""
+    response = await ctx.elicit(
+        message="Which date would you like to travel?",
+        schema={"type": "string", "format": "date"}
+    )
+    if response.action == "accept":
+        travel_date = response.content
+        return f"Booking flight to {destination} on {travel_date}"
+    return "Booking cancelled — date not provided"
+```
+
+| Piece | Why it matters |
+|---|---|
+| `ctx.elicit(message=..., schema=...)` | Pauses execution and sends a structured question to the client |
+| `schema` | Defines the expected answer type (string, date, enum, etc.) — like form validation |
+| `response.action` | Tells you whether the user accepted, declined, or cancelled |
+
+**When to use it:** multi-step workflows where not all information is available upfront and you need mid-task user input — bookings, form filling, confirmations.
+
+### 2.6 Roots
+
+**Direction: Client → Server.**
+
+Roots let the **client tell the server what its access boundary is** — which directories or URIs it's allowed to operate within, and nothing outside that.
+
+> Think of hiring a contractor to work on your house. You tell them: "This is your work area — kitchen and hall only, don't go into the bedroom." That boundary is a **root**.
+
+```python
+from mcp.types import Root
+
+# Client declares roots when initializing
+roots = [
+    Root(uri="file:///home/user/project", name="My Project"),
+    Root(uri="file:///home/user/documents", name="Documents"),
+]
+
+await session.initialize()
+
+# Server can then discover the allowed scope:
+available_roots = await session.list_roots()
+```
+
+| Piece | Why it matters |
+|---|---|
+| `Root(uri=..., name=...)` | Defines one specific directory/location the server may access |
+| Declared at `initialize()` | The client communicates the boundary right when the session starts |
+| `list_roots()` | The server calls this to discover — and respect — its allowed scope |
+
+**When to use it:** filesystem-based servers, where you want to restrict access to specific folders instead of granting access to an entire disk — a security and scoping mechanism.
+
 ---
 
-## 3. Important Imports Explained
+## 3. Sampling vs Elicitation — Don't Confuse Them
+
+| | Sampling | Elicitation |
+|---|---|---|
+| **Server asks…** | The client's LLM, for generation | The human user, for info/confirmation |
+| **Purpose** | AI reasoning / text generation | Missing data / confirmation |
+| **Example** | "Summarize this for me" | "What date do you want?" |
+
+---
+
+## 4. Client-Side Callbacks — Handling Server Requests
+
+Sampling, elicitation, and roots are all **server-initiated** requests — the server pauses and asks the client for something. On the client side, you handle each of these by passing a **callback function** into `ClientSession`. This is the syntax for wiring up every callback type in one place.
+
+```python
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
+from mcp.types import (
+    CreateMessageRequestParams, CreateMessageResult,
+    ElicitRequestParams, ElicitResult,
+    ListRootsResult, Root,
+    LoggingMessageNotificationParams,
+)
+
+# 1. SAMPLING callback — server asks: "please run this through your LLM"
+async def sampling_callback(
+    context, params: CreateMessageRequestParams
+) -> CreateMessageResult:
+    # In a real app, call your own LLM here (e.g. the Anthropic API)
+    user_text = params.messages[-1].content.text
+    generated = f"[LLM response to]: {user_text}"
+    return CreateMessageResult(
+        role="assistant",
+        content={"type": "text", "text": generated},
+        model="claude-sonnet-4-6",
+    )
+
+# 2. ELICITATION callback — server asks: "I need more info from the user"
+async def elicitation_callback(
+    context, params: ElicitRequestParams
+) -> ElicitResult:
+    # In a real app, prompt the actual user (CLI input, UI dialog, etc.)
+    print(f"Server is asking: {params.message}")
+    user_answer = input("> ")
+    return ElicitResult(action="accept", content={"value": user_answer})
+
+# 3. ROOTS callback — server asks: "what directories can I access?"
+async def list_roots_callback(context) -> ListRootsResult:
+    return ListRootsResult(
+        roots=[
+            Root(uri="file:///home/user/project", name="My Project"),
+            Root(uri="file:///home/user/documents", name="Documents"),
+        ]
+    )
+
+# 4. LOGGING callback — server pushes log messages to the client
+async def logging_callback(params: LoggingMessageNotificationParams) -> None:
+    print(f"[{params.level}] {params.logger}: {params.data}")
+
+# 5. MESSAGE HANDLER — catch-all for any other server-to-client message
+async def message_handler(message) -> None:
+    print(f"Received message: {message}")
+
+server_params = StdioServerParameters(command="python", args=["server.py"])
+
+async def main():
+    async with stdio_client(server_params) as (read, write):
+        async with ClientSession(
+            read,
+            write,
+            sampling_callback=sampling_callback,
+            elicitation_callback=elicitation_callback,
+            list_roots_callback=list_roots_callback,
+            logging_callback=logging_callback,
+            message_handler=message_handler,
+        ) as session:
+            await session.initialize()
+            tools = await session.list_tools()
+            print(tools)
+```
+
+### Callback Reference
+
+| Callback param | Fires when… | Return type | Purpose |
+|---|---|---|---|
+| `sampling_callback` | Server calls `ctx.session.create_message(...)` | `CreateMessageResult` | Route the request to your actual LLM and return its completion |
+| `elicitation_callback` | Server calls `ctx.elicit(...)` | `ElicitResult` | Ask the real user for input, then return `action="accept"/"decline"/"cancel"` |
+| `list_roots_callback` | Server calls `session.list_roots()` (or on connect, if roots capability is declared) | `ListRootsResult` | Tell the server which directories/URIs it's allowed to touch |
+| `logging_callback` | Server sends a log notification | `None` | Surface server-side logs in your client's UI/console |
+| `message_handler` | Any server-to-client message not covered by a specific callback | `None` | Catch-all hook — useful for debugging or custom notification types |
+
+> 💡 **Note:** All callbacks are optional. If you don't pass one and the server makes that kind of request, `ClientSession` returns a default "not supported" response instead of crashing.
+
+---
+
+## 5. Important Imports Explained
 
 | Import | What it does |
 |---|---|
-| **`FastMCP`** (`mcp.server.fastmcp`) | High-level, decorator-based API for building MCP servers quickly. Handles boilerplate (protocol handshake, schema generation from type hints) so you just write `@mcp.tool()`, `@mcp.resource()`, `@mcp.prompt()` functions. |
-| **`ClientSession`** (`mcp`) | The core client-side object. Wraps a read/write stream pair and gives you high-level methods: `initialize()`, `list_tools()`, `call_tool()`, `list_resources()`, `read_resource()`, `list_prompts()`, `get_prompt()`. |
-| **`StdioServerParameters`** (`mcp`) | Config object describing **how to launch a local server as a subprocess** — the command, arguments, and environment variables. Passed into `stdio_client()`. |
-| **`stdio_client`** (`mcp.client.stdio`) | An async context manager that spawns the server subprocess (using `StdioServerParameters`) and returns `(read, write)` streams for use with `ClientSession`. Used for **local** servers. |
-| **`streamablehttp_client`** (`mcp.client.streamable_http`) | An async context manager that connects to a **remote** MCP server over HTTP(S), returning `(read, write, get_session_id)` streams. Used for **deployed/hosted** servers. |
-| **`Context`** (`mcp.server.fastmcp`) | Passed into tool functions to give access to session-level features inside a server — logging, progress reporting, elicitation (`ctx.elicit`), and sampling (`ctx.session.create_message`). |
-| **`Tool` / `Resource` / `Prompt`** (`mcp.types`) | The underlying data models (Pydantic schemas) representing what a tool, resource, or prompt looks like on the wire — mostly relevant if you're working at a lower level than FastMCP. |
-| **`mcp.run(transport=...)`** | The server-side entry point that starts listening — `transport="stdio"` for local, `transport="streamable-http"` for remote-hosted servers. |
+| **`FastMCP`** (`mcp.server.fastmcp`) | High-level, decorator-based API for building MCP servers quickly. Handles boilerplate (protocol handshake, schema generation from type hints) so you just write `@mcp.tool()`, `@mcp.resource()`, `@mcp.prompt()` functions |
+| **`ClientSession`** (`mcp`) | The core client-side object. Wraps a read/write stream pair and gives high-level methods: `initialize()`, `list_tools()`, `call_tool()`, `list_resources()`, `read_resource()`, `list_prompts()`, `get_prompt()` |
+| **`StdioServerParameters`** (`mcp`) | Config object describing how to launch a local server as a subprocess — command, arguments, environment variables. Passed into `stdio_client()` |
+| **`stdio_client`** (`mcp.client.stdio`) | Async context manager that spawns the server subprocess and returns `(read, write)` streams. Used for **local** servers |
+| **`streamablehttp_client`** (`mcp.client.streamable_http`) | Async context manager that connects to a **remote** MCP server over HTTP(S), returning `(read, write, get_session_id)` streams. Used for **deployed/hosted** servers |
+| **`Context`** (`mcp.server.fastmcp`) | Passed into tool functions to give access to session-level features — logging, progress reporting, elicitation (`ctx.elicit`), sampling (`ctx.session.create_message`) |
+| **`Tool` / `Resource` / `Prompt`** (`mcp.types`) | Underlying Pydantic data models representing what a tool, resource, or prompt looks like on the wire — mostly relevant below the FastMCP abstraction layer |
+| **`Root`** (`mcp.types`) | Data model representing an access-boundary declaration made by the client |
+| **`CreateMessageResult`** (`mcp.types`) | Return type for a `sampling_callback` — wraps the LLM's generated response |
+| **`ElicitResult`** (`mcp.types`) | Return type for an `elicitation_callback` — wraps the user's answer plus `action` (accept/decline/cancel) |
+| **`ListRootsResult`** (`mcp.types`) | Return type for a `list_roots_callback` — wraps the list of `Root` objects the client is exposing |
+| **`mcp.run(transport=...)`** | Server-side entry point that starts listening — `transport="stdio"` for local, `transport="streamable-http"` for remote-hosted servers |
 
-### Quick mental model
+### Quick Mental Model
 
 ```
 Server side:  FastMCP  →  @mcp.tool()/@mcp.resource()/@mcp.prompt()  →  mcp.run(transport=...)
@@ -205,11 +408,11 @@ Client side:  stdio_client() or streamablehttp_client()  →  (read, write) stre
 
 ---
 
-## 4. MCP Inspector — Setup & Usage
+## 6. MCP Inspector — Setup & Usage
 
-**MCP Inspector** is Anthropic's official browser-based debugging tool for MCP servers. It lets you test tools, resources, and prompts **without needing a full client like Claude Desktop** — great for development and debugging.
+**MCP Inspector** is Anthropic's official browser-based debugging tool for MCP servers. It lets you test tools, resources, and prompts **without needing a full client** like Claude Desktop — great for development and debugging.
 
-### 4.1 Running Inspector
+### 6.1 Running Inspector
 
 No installation needed — run it directly with `npx`:
 
@@ -222,20 +425,20 @@ This will:
 2. Start a local web UI (usually at `http://localhost:6274`)
 3. Open your browser to the Inspector interface
 
-### 4.2 For servers with dependencies (using `uv`)
+### 6.2 For Servers with Dependencies (using `uv`)
 
 ```bash
 npx @modelcontextprotocol/inspector uv run python your_server.py
 ```
 
-### 4.3 Inspecting a remote (HTTP) server
+### 6.3 Inspecting a Remote (HTTP) Server
 
 ```bash
 npx @modelcontextprotocol/inspector
 ```
 Then, in the Inspector UI, manually enter the server's URL and select **Streamable HTTP** as the transport type, instead of launching a local process.
 
-### 4.4 What you can do inside Inspector
+### 6.4 What You Can Do Inside Inspector
 
 | Tab | Purpose |
 |---|---|
@@ -244,7 +447,7 @@ Then, in the Inspector UI, manually enter the server's URL and select **Streamab
 | **Prompts** | View and test prompt templates with sample arguments |
 | **Notifications** | See real-time logs, progress updates, and errors from the server |
 
-### 4.5 Typical debugging workflow
+### 6.5 Typical Debugging Workflow
 
 1. Write/update your server code (`your_server.py`)
 2. Run `npx @modelcontextprotocol/inspector python your_server.py`
@@ -253,24 +456,60 @@ Then, in the Inspector UI, manually enter the server's URL and select **Streamab
 5. Check the response and the **Notifications** panel for errors
 6. Fix issues, restart Inspector, repeat
 
-### 4.6 Common gotchas
+<details>
+<summary><strong>⚠️ Common Gotchas (click to expand)</strong></summary>
+<br>
 
 - Missing **docstrings** on `@mcp.tool()` functions can cause schema generation issues — always document your tools.
-- If Inspector can't connect, double check the `command`/`args` match exactly how you'd run the script from the terminal.
+- If Inspector can't connect, double-check the `command`/`args` match exactly how you'd run the script from the terminal.
 - For `uv`-managed projects, always launch via `uv run ...` inside the Inspector command so the correct virtual environment is used.
+- Newer Inspector versions (v0.14+) require session-token authentication — check the terminal output for the token/URL Inspector prints on startup.
+
+</details>
 
 ---
 
-## Summary Cheat Sheet
+## 7. Quick Recap Table
+
+| Concept | Direction | Purpose | Analogy |
+|---|---|---|---|
+| **Server** | — | Hosts tools/resources/prompts | Kitchen |
+| **Client** | — | Connects to a server and uses it | Waiter |
+| **stdio** | Local | Same-machine communication | Intercom |
+| **Streamable HTTP** | Network | Remote/shared communication | Phone call |
+| **Sampling** | Server → Client's LLM | AI text generation | "Ask your chef for me" |
+| **Elicitation** | Server → User | Missing info/confirmation | "Ask the customer directly" |
+| **Roots** | Client → Server | Defines the access boundary | "This is your work area" |
+
+---
+
+## 8. Summary Cheat Sheet
 
 ```
 MCP = standard protocol connecting AI models ↔ external tools/data
 
-Server  → exposes tools/resources/prompts   (FastMCP)
-Client  → connects to ONE server            (ClientSession)
-Transport → stdio (local) or Streamable HTTP (remote)
-Elicitation → server asks user for input mid-task
+Server      → exposes tools/resources/prompts     (FastMCP)
+Client      → connects to ONE server               (ClientSession)
+Transport   → stdio (local) or Streamable HTTP (remote)
 Sampling    → server asks client's LLM for a completion
+Elicitation → server asks user for input mid-task
+Roots       → client tells server its access boundary
 
 Debug everything with: npx @modelcontextprotocol/inspector <run-command>
 ```
+
+---
+
+## 9. What to Practice Next
+
+- [ ] Build a small FastMCP server with at least one tool, one resource, and one prompt
+- [ ] Connect to it with MCP Inspector and confirm the schema is generated correctly
+- [ ] Write a minimal client using `stdio_client` + `ClientSession`
+- [ ] Add a sampling-based tool (e.g. a summarizer that borrows the client's LLM)
+- [ ] Add an elicitation flow for a multi-step task (e.g. a booking tool)
+- [ ] Deploy a server with `transport="streamable-http"` and connect Inspector to it remotely
+- [ ] Experiment with `Root` declarations to scope a filesystem server's access
+
+---
+
+<p align="center"><i>Built as a personal learning reference while working through Anthropic's "Introduction to MCP" certification and hands-on FastMCP projects.</i></p>
