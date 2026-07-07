@@ -45,7 +45,7 @@ async def main():
             )
 
             for content in result.content:
-                print(content.txt)
+                print(content.text)
 
             
             await session.call_tool(
