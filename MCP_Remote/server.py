@@ -36,10 +36,6 @@ def write_file(filename:str,content:str):
         return "file not found"
     with open(path,"w",encoding="utf-8")as f:
         return f.write(content)
-
-
-
-
-
+        
 if __name__ == "__main__":
     mcp.run(transport="streamable-http")
