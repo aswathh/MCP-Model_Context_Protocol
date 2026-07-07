@@ -73,4 +73,4 @@ async def run_http():
 
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "stdio"
-    asyncio.run(run_http() if mode == "http" else run_stdio())
+    asyncio.run(run_http() if mode == "http" else run_stdio()) 
